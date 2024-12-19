@@ -16,7 +16,7 @@ import numpy as np
 import rospy
 from autolab_core import RigidTransform
 from frankapy import SensorDataMessageType
-from frankapy.proto import CartesianImpedanceSensorMessage, PosePositionSensorMessage
+from frankapy.proto import CartesianImpedanceSensorMessage, PosePositionSensorMessage, JointPositionSensorMessage
 from frankapy.proto_utils import make_sensor_group_msg, sensor_proto2ros_msg
 from scipy.spatial.transform import Rotation
 
@@ -66,7 +66,7 @@ def go_to_pos(franka_arm, pos, duration):
     print("\nCurrent position:", curr_pose.translation)
 
 
-def go_to_pose(franka_arm, pos, ori_mat, duration, use_impedance):
+def go_to_pose(franka_arm, pos, ori_mat, duration, use_impedance, block=True):
     """Goes to a specified pose."""
     # Compose goal transform
     transform = RigidTransform(
@@ -79,6 +79,7 @@ def go_to_pose(franka_arm, pos, ori_mat, duration, use_impedance):
         duration=duration,
         use_impedance=use_impedance,
         ignore_virtual_walls=True,
+        block=block,
     )
     print("Finished going to goal pose.")
 
@@ -105,7 +106,7 @@ def go_home(franka_arm, duration):
     print("\nGoing to home configuration...")
     go_to_joint_angles(
         franka_arm=franka_arm,
-        joint_angles=[0.0, -1.76076077e-01, 0.0, -1.86691416e00, 0.0, 1.69344379e00, np.pi / 4],
+        joint_angles=[0.0, -1.01627597, 0.0, -2.21283626, 0.0, 1.20934282, np.pi / 4],      # prevent the arm from occluding the scene
         duration=duration,
     )
     print("Reached home configuration.")
@@ -324,6 +325,17 @@ def compose_ros_msg(targ_pos, targ_ori_quat, prop_gains, msg_count):
 
     return ros_msg
 
+def compose_ros_msg_joints(targ_joint_angles, msg_count):
+    curr_time = rospy.Time.now().to_time()
+    traj_gen_proto_msg = JointPositionSensorMessage(
+        id=msg_count, timestamp=curr_time, 
+        joints=targ_joint_angles
+    )
+    ros_msg = make_sensor_group_msg(
+        trajectory_generator_sensor_msg=sensor_proto2ros_msg(
+            traj_gen_proto_msg, SensorDataMessageType.JOINT_POSITION)
+    )
+    return ros_msg
 
 def set_sigint_response(franka_arm):
     """Sets a custom response to a SIGINT signal, which is executed on Ctrl + C."""
